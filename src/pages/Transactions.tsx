@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Search,
@@ -51,156 +51,29 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { Transaction, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
+import { Category } from '@/types/finance';
+import {sampleCategories} from '@/pages/Categories'
 
-// Extended sample data
-const sampleTransactions: Transaction[] = [
-  {
-    id: '1',
-    user_id: 'demo',
-    date: '2024-01-15',
-    description: 'Monthly Salary',
-    merchant: 'Tech Corp Inc.',
-    amount: 5500,
-    currency: 'CAD',
-    type: 'income',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '1', user_id: 'demo', name: 'Salary', type: 'income', is_system: true, is_active: true, created_at: '' },
-    account: { id: '1', user_id: 'demo', name: 'TD Chequing', type: 'checking', currency: 'CAD', balance: 5000, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '2',
-    user_id: 'demo',
-    date: '2024-01-14',
-    description: 'Loblaw Groceries',
-    merchant: 'Loblaws',
-    amount: 156.42,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: false,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '2', user_id: 'demo', name: 'Groceries', type: 'expense', is_system: true, is_active: true, created_at: '' },
-    account: { id: '2', user_id: 'demo', name: 'TD Visa', type: 'credit_card', currency: 'CAD', balance: -1200, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '3',
-    user_id: 'demo',
-    date: '2024-01-13',
-    description: 'Netflix Subscription',
-    merchant: 'Netflix',
-    amount: 16.99,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '3', user_id: 'demo', name: 'Subscriptions', type: 'expense', is_system: true, is_active: true, created_at: '' },
-    account: { id: '2', user_id: 'demo', name: 'TD Visa', type: 'credit_card', currency: 'CAD', balance: -1200, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '4',
-    user_id: 'demo',
-    date: '2024-01-12',
-    description: 'Tim Hortons Coffee',
-    merchant: 'Tim Hortons',
-    amount: 8.45,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: false,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '4', user_id: 'demo', name: 'Dining Out', type: 'expense', is_system: true, is_active: true, created_at: '' },
-    account: { id: '2', user_id: 'demo', name: 'TD Visa', type: 'credit_card', currency: 'CAD', balance: -1200, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '5',
-    user_id: 'demo',
-    date: '2024-01-11',
-    description: 'TFSA Contribution',
-    merchant: 'Wealthsimple',
-    amount: 500,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '5', user_id: 'demo', name: 'TFSA', type: 'savings', is_system: true, is_active: true, created_at: '' },
-    account: { id: '1', user_id: 'demo', name: 'TD Chequing', type: 'checking', currency: 'CAD', balance: 5000, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '6',
-    user_id: 'demo',
-    date: '2024-01-10',
-    description: 'Rent Payment',
-    merchant: 'Property Management Co.',
-    amount: 1800,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '6', user_id: 'demo', name: 'Rent/Mortgage', type: 'expense', is_system: true, is_active: true, created_at: '' },
-    account: { id: '1', user_id: 'demo', name: 'TD Chequing', type: 'checking', currency: 'CAD', balance: 5000, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '7',
-    user_id: 'demo',
-    date: '2024-01-09',
-    description: 'GST/HST Credit',
-    merchant: 'CRA',
-    amount: 125,
-    currency: 'CAD',
-    type: 'income',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '7', user_id: 'demo', name: 'Government Benefits', type: 'income', is_system: true, is_active: true, created_at: '' },
-    account: { id: '1', user_id: 'demo', name: 'TD Chequing', type: 'checking', currency: 'CAD', balance: 5000, is_active: true, created_at: '', updated_at: '' },
-  },
-  {
-    id: '8',
-    user_id: 'demo',
-    date: '2024-01-08',
-    description: 'Amazon Purchase Refund',
-    merchant: 'Amazon.ca',
-    amount: 45.99,
-    currency: 'CAD',
-    type: 'refund',
-    is_recurring: false,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '8', user_id: 'demo', name: 'Refunds', type: 'income', is_system: true, is_active: true, created_at: '' },
-    account: { id: '2', user_id: 'demo', name: 'TD Visa', type: 'credit_card', currency: 'CAD', balance: -1200, is_active: true, created_at: '', updated_at: '' },
-  },
-];
+// ------------------------
+type TransactionType = 'income' | 'expense' | 'transfer' | 'refund';
+
+interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  merchant?: string;
+  amount: number;
+  currency: string;
+  type: TransactionType;
+  category?: string;
+  account?: string;
+  is_recurring?: boolean;
+  is_pending?: boolean;
+  is_ignored?: boolean;
+}
+
+const STORAGE_KEY = 'transactions';
 
 const typeColors: Record<TransactionType, string> = {
   income: 'bg-income/10 text-income border-income/20',
@@ -210,23 +83,150 @@ const typeColors: Record<TransactionType, string> = {
 };
 
 export default function Transactions() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
-  const filteredTransactions = sampleTransactions.filter((t) => {
+  const [form, setForm] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    type: 'expense',
+    description: '',
+    merchant: '',
+    amount: '',
+    currency: 'CAD',
+    category: '',
+    account: '',
+    notes: '',
+  });
+
+  // Load from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) setTransactions(JSON.parse(stored));
+    // categories already initialized from sampleCategories
+  }, []);
+
+  function saveTransactions(data: Transaction[]) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    setTransactions(data);
+  }
+
+  function openDialog(transaction?: Transaction) {
+    if (transaction) {
+      setEditId(transaction.id);
+      setForm({
+        date: transaction.date,
+        type: transaction.type,
+        description: transaction.description,
+        merchant: transaction.merchant || '',
+        amount: transaction.amount.toString(),
+        currency: transaction.currency,
+        category: transaction.category || '',
+        account: transaction.account || '',
+        notes: '',
+      });
+    } else {
+      setEditId(null);
+      setForm({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        type: 'expense',
+        description: '',
+        merchant: '',
+        amount: '',
+        currency: 'CAD',
+        category: '',
+        account: '',
+        notes: '',
+      });
+    }
+    setIsDialogOpen(true);
+  }
+
+  function handleFormChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    setForm({ ...form, [e.target.id]: e.target.value });
+  }
+
+  function handleSelectChange(field: keyof typeof form, value: string) {
+    setForm({ ...form, [field]: value });
+  }
+
+  function saveTransaction() {
+    if (!form.description || !form.amount) {
+      alert('Description and amount are required');
+      return;
+    }
+
+    const newTransaction: Transaction = {
+      id: editId || Date.now().toString(),
+      date: form.date,
+      description: form.description,
+      merchant: form.merchant,
+      amount: Number(form.amount),
+      currency: form.currency,
+      type: form.type as TransactionType,
+      category: form.category,
+      account: form.account,
+      is_recurring: false,
+      is_pending: false,
+      is_ignored: false,
+    };
+
+    const updated = editId
+      ? transactions.map(t => (t.id === editId ? newTransaction : t))
+      : [newTransaction, ...transactions];
+
+    saveTransactions(updated);
+    setIsDialogOpen(false);
+  }
+
+  function deleteTransaction(id: string) {
+    if (!confirm('Delete transaction?')) return;
+    saveTransactions(transactions.filter(t => t.id !== id));
+  }
+
+  function toggleIgnore(id: string) {
+    saveTransactions(
+      transactions.map(t => (t.id === id ? { ...t, is_ignored: !t.is_ignored } : t))
+    );
+  }
+
+  function exportCSV() {
+    if (transactions.length === 0) {
+      alert('No data');
+      return;
+    }
+
+    let csv =
+      'Date,Description,Merchant,Type,Category,Account,Amount,Currency\n';
+    transactions.forEach(t => {
+      csv += `${t.date},"${t.description}","${t.merchant || ''}",${t.type},${
+        t.category || ''
+      },${t.account || ''},${t.amount},${t.currency}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transactions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const filteredTransactions = transactions.filter(t => {
     const matchesSearch =
       t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.merchant?.toLowerCase().includes(searchQuery.toLowerCase());
+      (t.merchant || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || t.type === typeFilter;
-    const matchesCategory =
-      categoryFilter === 'all' || t.category?.name === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
     return matchesSearch && matchesType && matchesCategory;
   });
 
   const uniqueCategories = Array.from(
-    new Set(sampleTransactions.map((t) => t.category?.name).filter(Boolean))
+    new Set(transactions.map(t => t.category).filter(Boolean))
   );
 
   return (
@@ -243,131 +243,14 @@ export default function Transactions() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Add Transaction</DialogTitle>
-                  <DialogDescription>
-                    Manually add a new transaction to your records.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="date">Date</Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        defaultValue={format(new Date(), 'yyyy-MM-dd')}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Type</Label>
-                      <Select defaultValue="expense">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="income">Income</SelectItem>
-                          <SelectItem value="expense">Expense</SelectItem>
-                          <SelectItem value="transfer">Transfer</SelectItem>
-                          <SelectItem value="refund">Refund</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Input id="description" placeholder="Enter description" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="merchant">Merchant (optional)</Label>
-                    <Input id="merchant" placeholder="Store or company name" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Amount</Label>
-                      <Input
-                        id="amount"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
-                      <Select defaultValue="CAD">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CAD">CAD</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {uniqueCategories.map((cat) => (
-                            <SelectItem key={cat} value={cat || ''}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="account">Account</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="td-chequing">TD Chequing</SelectItem>
-                          <SelectItem value="td-visa">TD Visa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notes (optional)</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Add any additional notes"
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsAddDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={() => setIsAddDialogOpen(false)}>
-                    Add Transaction
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" onClick={() => openDialog()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Transaction
+            </Button>
           </div>
         </div>
 
@@ -378,7 +261,7 @@ export default function Transactions() {
             <Input
               placeholder="Search transactions..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -403,7 +286,7 @@ export default function Transactions() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {uniqueCategories.map((cat) => (
+                {uniqueCategories.map(cat => (
                   <SelectItem key={cat} value={cat || ''}>
                     {cat}
                   </SelectItem>
@@ -443,7 +326,7 @@ export default function Transactions() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredTransactions.map((transaction) => (
+                filteredTransactions.map(transaction => (
                   <TableRow
                     key={transaction.id}
                     className={cn(
@@ -466,18 +349,12 @@ export default function Transactions() {
                         )}
                         <div className="mt-1 flex items-center gap-2">
                           {transaction.is_recurring && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs px-1.5 py-0"
-                            >
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
                               Recurring
                             </Badge>
                           )}
                           {transaction.is_pending && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs px-1.5 py-0"
-                            >
+                            <Badge variant="outline" className="text-xs px-1.5 py-0">
                               Pending
                             </Badge>
                           )}
@@ -486,11 +363,11 @@ export default function Transactions() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {transaction.category?.name || 'Uncategorized'}
+                        {transaction.category || 'Uncategorized'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {transaction.account?.name || '—'}
+                      {transaction.account || '—'}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -509,8 +386,7 @@ export default function Transactions() {
                           transaction.type === 'refund' && 'text-info'
                         )}
                       >
-                        {transaction.type === 'income' ||
-                        transaction.type === 'refund'
+                        {transaction.type === 'income' || transaction.type === 'refund'
                           ? '+'
                           : '-'}
                         {formatCurrency(Math.abs(transaction.amount))}
@@ -524,7 +400,7 @@ export default function Transactions() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openDialog(transaction)}>
                             <Edit2 className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -532,7 +408,7 @@ export default function Transactions() {
                             <Tag className="mr-2 h-4 w-4" />
                             Change Category
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleIgnore(transaction.id)}>
                             {transaction.is_ignored ? (
                               <>
                                 <Eye className="mr-2 h-4 w-4" />
@@ -546,7 +422,10 @@ export default function Transactions() {
                             )}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => deleteTransaction(transaction.id)}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
@@ -564,6 +443,155 @@ export default function Transactions() {
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <p>Showing {filteredTransactions.length} transactions</p>
         </div>
+
+        {/* Add/Edit Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{editId ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+              <DialogDescription>
+                {editId
+                  ? 'Update your transaction details.'
+                  : 'Manually add a new transaction to your records.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={form.date}
+                    onChange={handleFormChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={form.type}
+                    onValueChange={val => handleSelectChange('type', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="refund">Refund</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  placeholder="Enter description"
+                  value={form.description}
+                  onChange={handleFormChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="merchant">Merchant (optional)</Label>
+                <Input
+                  id="merchant"
+                  placeholder="Store or company name"
+                  value={form.merchant}
+                  onChange={handleFormChange}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.amount}
+                    onChange={handleFormChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select
+                    value={form.currency}
+                    onValueChange={val => handleSelectChange('currency', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CAD">CAD</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={form.category}
+                    onValueChange={val => handleSelectChange('category', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {sampleCategories
+                      .filter(c => c.parent_id)
+                      .map(c => (
+                        <SelectItem key={c.id} value={c.name}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account">Account</Label>
+                  <Select
+                    value={form.account}
+                    onValueChange={val => handleSelectChange('account', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="td-chequing">TD Chequing</SelectItem>
+                      <SelectItem value="td-visa">TD Visa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add any additional notes"
+                  rows={2}
+                  value={form.notes}
+                  onChange={handleFormChange}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveTransaction}>
+                {editId ? 'Update Transaction' : 'Add Transaction'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

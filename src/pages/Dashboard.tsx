@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DollarSign,
   TrendingUp,
@@ -22,123 +22,108 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/types/finance';
 
-// Sample demo data
-const sampleTransactions: Transaction[] = [
-  {
-    id: '1',
-    user_id: 'demo',
-    date: '2024-01-15',
-    description: 'Monthly Salary',
-    merchant: 'Tech Corp Inc.',
-    amount: 5500,
-    currency: 'CAD',
-    type: 'income',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '1', user_id: 'demo', name: 'Salary', type: 'income', is_system: true, is_active: true, created_at: '' },
-  },
-  {
-    id: '2',
-    user_id: 'demo',
-    date: '2024-01-14',
-    description: 'Loblaw Groceries',
-    merchant: 'Loblaws',
-    amount: 156.42,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: false,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '2', user_id: 'demo', name: 'Groceries', type: 'expense', is_system: true, is_active: true, created_at: '' },
-  },
-  {
-    id: '3',
-    user_id: 'demo',
-    date: '2024-01-13',
-    description: 'Netflix Subscription',
-    merchant: 'Netflix',
-    amount: 16.99,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '3', user_id: 'demo', name: 'Subscriptions', type: 'expense', is_system: true, is_active: true, created_at: '' },
-  },
-  {
-    id: '4',
-    user_id: 'demo',
-    date: '2024-01-12',
-    description: 'Tim Hortons',
-    merchant: 'Tim Hortons',
-    amount: 8.45,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: false,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '4', user_id: 'demo', name: 'Dining Out', type: 'expense', is_system: true, is_active: true, created_at: '' },
-  },
-  {
-    id: '5',
-    user_id: 'demo',
-    date: '2024-01-11',
-    description: 'TFSA Contribution',
-    merchant: 'Wealthsimple',
-    amount: 500,
-    currency: 'CAD',
-    type: 'expense',
-    is_recurring: true,
-    is_split: false,
-    is_ignored: false,
-    is_pending: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    category: { id: '5', user_id: 'demo', name: 'TFSA', type: 'savings', is_system: true, is_active: true, created_at: '' },
-  },
-];
-
-const expenseBreakdownData = [
-  { name: 'Housing', value: 1800, color: 'hsl(var(--chart-1))' },
-  { name: 'Groceries', value: 650, color: 'hsl(var(--chart-2))' },
-  { name: 'Transportation', value: 350, color: 'hsl(var(--chart-3))' },
-  { name: 'Dining', value: 280, color: 'hsl(var(--chart-4))' },
-  { name: 'Entertainment', value: 200, color: 'hsl(var(--chart-5))' },
-  { name: 'Other', value: 320, color: 'hsl(var(--chart-6))' },
-];
-
-const trendData = [
-  { month: 'Jul', income: 5500, expenses: 3800, savings: 1700 },
-  { month: 'Aug', income: 5500, expenses: 4100, savings: 1400 },
-  { month: 'Sep', income: 5700, expenses: 3600, savings: 2100 },
-  { month: 'Oct', income: 5500, expenses: 3900, savings: 1600 },
-  { month: 'Nov', income: 5800, expenses: 4200, savings: 1600 },
-  { month: 'Dec', income: 6200, expenses: 4800, savings: 1400 },
-  { month: 'Jan', income: 5500, expenses: 3600, savings: 1900 },
-];
-
-const monthlyComparisonData = [
-  { month: 'Dec 23', income: 5200, expenses: 4100 },
-  { month: 'Jan 24', income: 5500, expenses: 3600 },
-];
-
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('this-month');
+
+  // Fetch user transactions
+  const fetchTransactions = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from<Transaction>('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false });
+    if (error) console.error(error);
+    else setTransactions(data || []);
+    setLoading(false);
+  };
+
+  // Add transaction
+  const addTransaction = async (
+    newTransaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>
+  ) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('transactions')
+      .insert([{ ...newTransaction, user_id: user.id }]);
+    if (error) console.error(error);
+    else fetchTransactions();
+  };
+
+  // Delete transaction
+  const deleteTransaction = async (id: string) => {
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) console.error(error);
+    else fetchTransactions();
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [user]);
+
+  // Compute dynamic KPIs
+  const totalIncome = transactions
+    .filter((t) => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const netCashFlow = totalIncome - totalExpenses;
+  const savingsRate = totalIncome ? (netCashFlow / totalIncome) * 100 : 0;
+
+  // Dynamic trend data
+  const trendData = transactions.reduce<
+    { month: string; income: number; expenses: number; savings: number }[]
+  >((acc, t) => {
+    const month = new Date(t.date).toLocaleString('default', { month: 'short' });
+    let existing = acc.find((m) => m.month === month);
+    if (!existing) {
+      existing = { month, income: 0, expenses: 0, savings: 0 };
+      acc.push(existing);
+    }
+    if (t.type === 'income') existing.income += t.amount;
+    if (t.type === 'expense') existing.expenses += t.amount;
+    existing.savings = existing.income - existing.expenses;
+    return acc;
+  }, []);
+
+  // Dynamic expense breakdown
+  const expenseBreakdownData = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce<{ name: string; value: number; color: string }[]>((acc, t, i) => {
+      const existing = acc.find((e) => e.name === t.category.name);
+      if (existing) existing.value += t.amount;
+      else
+        acc.push({
+          name: t.category.name,
+          value: t.amount,
+          color: `hsl(var(--chart-${(i % 6) + 1}))`,
+        });
+      return acc;
+    }, []);
+
+  // Registered account totals
+  const tfsaTotal = transactions
+    .filter((t) => t.category.name === 'TFSA')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const rrspTotal = transactions
+    .filter((t) => t.category.name === 'RRSP')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const fhsaTotal = transactions
+    .filter((t) => t.category.name === 'FHSA')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <AppLayout>
@@ -172,64 +157,22 @@ export default function Dashboard() {
 
         {/* KPI Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KPICard
-            title="Total Income"
-            value={5500}
-            change={5.2}
-            changeLabel="vs last month"
-            icon={<DollarSign className="h-5 w-5" />}
-            variant="income"
-            className="animate-slide-up"
-          />
-          <KPICard
-            title="Total Expenses"
-            value={3600}
-            change={-8.3}
-            changeLabel="vs last month"
-            icon={<TrendingDown className="h-5 w-5" />}
-            variant="expense"
-            className="animate-slide-up delay-100"
-          />
-          <KPICard
-            title="Net Cash Flow"
-            value={1900}
-            change={12.1}
-            changeLabel="vs last month"
-            icon={<TrendingUp className="h-5 w-5" />}
-            variant="savings"
-            className="animate-slide-up delay-200"
-          />
-          <KPICard
-            title="Savings Rate"
-            value={34.5}
-            format="percent"
-            change={3.2}
-            changeLabel="vs last month"
-            icon={<PiggyBank className="h-5 w-5" />}
-            variant="default"
-            className="animate-slide-up delay-300"
-          />
+          <KPICard title="Total Income" value={totalIncome} icon={<DollarSign className="h-5 w-5" />} variant="income" />
+          <KPICard title="Total Expenses" value={totalExpenses} icon={<TrendingDown className="h-5 w-5" />} variant="expense" />
+          <KPICard title="Net Cash Flow" value={netCashFlow} icon={<TrendingUp className="h-5 w-5" />} variant="savings" />
+          <KPICard title="Savings Rate" value={savingsRate} format="percent" icon={<PiggyBank className="h-5 w-5" />} />
         </div>
 
         {/* Net Worth Banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-6 text-primary-foreground shadow-glow animate-slide-up delay-400">
+        <div className="rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-6 text-primary-foreground shadow-glow">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-primary-foreground/80">
-                Total Net Worth
-              </p>
-              <p className="font-display text-4xl font-bold">$47,250.00</p>
-              <p className="mt-1 text-sm text-primary-foreground/70">
-                <span className="text-accent">↑ 4.2%</span> from last month
-              </p>
+              <p className="text-sm font-medium text-primary-foreground/80">Total Net Worth</p>
+              <p className="font-display text-4xl font-bold">${netCashFlow.toFixed(2)}</p>
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                variant="secondary"
-                className="bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <Wallet className="mr-2 h-4 w-4" />
-                View Breakdown
+              <Button variant="secondary">
+                <Wallet className="mr-2 h-4 w-4" /> View Breakdown
               </Button>
             </div>
           </div>
@@ -237,35 +180,38 @@ export default function Dashboard() {
 
         {/* Charts Row */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <IncomeExpenseTrendChart data={trendData} />
-          <ExpenseBreakdownChart data={expenseBreakdownData} />
+          {transactions.length > 0 ? (
+            <>
+              <IncomeExpenseTrendChart data={trendData} />
+              <ExpenseBreakdownChart data={expenseBreakdownData} />
+            </>
+          ) : (
+            <p className="col-span-3 text-center text-muted-foreground">
+              No data to display charts. Add transactions to see trends.
+            </p>
+          )}
         </div>
 
         {/* Registered Accounts */}
         <div>
-          <h2 className="mb-4 font-display text-xl font-semibold">
-            Registered Accounts (2024)
-          </h2>
+          <h2 className="mb-4 font-display text-xl font-semibold">Registered Accounts (2024)</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <RegisteredAccountCard
-              accountType="TFSA"
-              contributed={4500}
-            />
-            <RegisteredAccountCard
-              accountType="RRSP"
-              contributed={8200}
-            />
-            <RegisteredAccountCard
-              accountType="FHSA"
-              contributed={3000}
-            />
+            <RegisteredAccountCard accountType="TFSA" contributed={tfsaTotal} />
+            <RegisteredAccountCard accountType="RRSP" contributed={rrspTotal} />
+            <RegisteredAccountCard accountType="FHSA" contributed={fhsaTotal} />
           </div>
         </div>
 
         {/* Bottom Row */}
         <div className="grid gap-6 lg:grid-cols-2">
-          <RecentTransactions transactions={sampleTransactions} />
-          <MonthlyComparisonChart data={monthlyComparisonData} />
+          {transactions.length > 0 ? (
+            <RecentTransactions transactions={transactions} onAdd={addTransaction} onDelete={deleteTransaction} />
+          ) : (
+            <p className="text-center text-muted-foreground">
+              No transactions yet. Add your first transaction to get started!
+            </p>
+          )}
+          <MonthlyComparisonChart data={[]} />
         </div>
       </div>
     </AppLayout>

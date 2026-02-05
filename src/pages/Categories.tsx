@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils';
 import { Category, CategoryRule, CategoryType } from '@/types/finance';
 
 // Sample categories with hierarchy
-const sampleCategories: Category[] = [
+export const sampleCategories: Category[] = [
   { id: '1', user_id: 'demo', name: 'Income', type: 'income', is_system: true, is_active: true, created_at: '', color: '#22c55e' },
   { id: '2', user_id: 'demo', name: 'Salary', type: 'income', parent_id: '1', is_system: true, is_active: true, created_at: '', color: '#22c55e' },
   { id: '3', user_id: 'demo', name: 'Freelance', type: 'income', parent_id: '1', is_system: true, is_active: true, created_at: '', color: '#22c55e' },
@@ -69,7 +69,7 @@ const sampleCategories: Category[] = [
 ];
 
 // Sample categorization rules
-const sampleRules: CategoryRule[] = [
+export const sampleRules: CategoryRule[] = [
   { id: '1', user_id: 'demo', category_id: '21', rule_type: 'merchant', pattern: 'loblaws', priority: 10, is_active: true, created_at: '' },
   { id: '2', user_id: 'demo', category_id: '21', rule_type: 'merchant', pattern: 'no frills', priority: 10, is_active: true, created_at: '' },
   { id: '3', user_id: 'demo', category_id: '22', rule_type: 'merchant', pattern: 'tim hortons', priority: 10, is_active: true, created_at: '' },
