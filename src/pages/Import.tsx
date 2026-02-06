@@ -248,7 +248,6 @@ export default function ImportTransactionsPage() {
       const credit = parseFloat(creditRaw) || 0;
       const debit = parseFloat(debitRaw) || 0;
       const balance = parseFloat(balanceRaw) || 0;
-
       let amount = 0;
       let type: 'income' | 'expense' = 'expense';
 

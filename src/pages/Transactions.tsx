@@ -46,14 +46,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
-import { Category } from '@/types/finance';
-import {sampleCategories} from '@/pages/Categories'
+import { sampleCategories } from '@/pages/Categories';
 
 // ------------------------
 type TransactionType = 'income' | 'expense' | 'transfer' | 'refund';
@@ -90,6 +88,10 @@ export default function Transactions() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10); // default 10
+
   const [form, setForm] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     type: 'expense',
@@ -106,7 +108,6 @@ export default function Transactions() {
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) setTransactions(JSON.parse(stored));
-    // categories already initialized from sampleCategories
   }, []);
 
   function saveTransactions(data: Transaction[]) {
@@ -216,6 +217,7 @@ export default function Transactions() {
     URL.revokeObjectURL(url);
   }
 
+  // Filtered transactions
   const filteredTransactions = transactions.filter(t => {
     const matchesSearch =
       t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -224,6 +226,18 @@ export default function Transactions() {
     const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
     return matchesSearch && matchesType && matchesCategory;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage) || 1;
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  // Reset page if filters/search reduce total pages
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [filteredTransactions.length, totalPages, currentPage]);
 
   const uniqueCategories = Array.from(
     new Set(transactions.map(t => t.category).filter(Boolean))
@@ -316,7 +330,7 @@ export default function Transactions() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTransactions.length === 0 ? (
+              {paginatedTransactions.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={7}
@@ -326,7 +340,7 @@ export default function Transactions() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredTransactions.map(transaction => (
+                paginatedTransactions.map(transaction => (
                   <TableRow
                     key={transaction.id}
                     className={cn(
@@ -439,9 +453,50 @@ export default function Transactions() {
           </Table>
         </div>
 
-        {/* Pagination hint */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <p>Showing {filteredTransactions.length} transactions</p>
+        {/* Pagination controls */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Rows per page:</span>
+            <Select
+              value={rowsPerPage.toString()}
+              onValueChange={val => {
+                setRowsPerPage(Number(val));
+                setCurrentPage(1); // reset to first page
+              }}
+            >
+              <SelectTrigger className="w-[70px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Add/Edit Dialog */}
@@ -544,14 +599,14 @@ export default function Transactions() {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                    {sampleCategories
-                      .filter(c => c.parent_id)
-                      .map(c => (
-                        <SelectItem key={c.id} value={c.name}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
+                      {sampleCategories
+                        .filter(c => c.parent_id)
+                        .map(c => (
+                          <SelectItem key={c.id} value={c.name}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
