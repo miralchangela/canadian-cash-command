@@ -87,6 +87,7 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // default: latest first
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -218,14 +219,20 @@ export default function Transactions() {
   }
 
   // Filtered transactions
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = transactions
+  .filter(t => {
     const matchesSearch =
       t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.merchant || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || t.type === typeFilter;
     const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
     return matchesSearch && matchesType && matchesCategory;
+  })
+  .sort((a, b) => {
+    if (sortOrder === 'asc') return new Date(a.date).getTime() - new Date(b.date).getTime();
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage) || 1;
@@ -316,10 +323,15 @@ export default function Transactions() {
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="w-[100px]">
-                  <Button variant="ghost" size="sm" className="-ml-3 h-8">
-                    Date
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
+                  <Button
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-3 h-8"
+                  onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
+                    >
+                  Date
+                  <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
                 </TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Category</TableHead>
