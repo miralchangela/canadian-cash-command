@@ -25,10 +25,9 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table';
-import { Upload, FileText, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// -----------------------------
 const EMPTY_VALUE = '__NONE__';
 
 type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
@@ -45,6 +44,7 @@ interface HeaderMapping {
   debit?: string;
   credit?: string;
   balance?: string;
+  amount?: string;
 }
 
 interface Transaction {
@@ -58,7 +58,6 @@ interface Transaction {
   account: string;
 }
 
-// -----------------------------
 export default function ImportTransactionsPage() {
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -70,8 +69,9 @@ export default function ImportTransactionsPage() {
   const [importProgress, setImportProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+
   // -----------------------------
-  // Parse CSV - Dynamic delimiter detection
+  // Parse CSV
   // -----------------------------
   const parseCSV = (file: File) => {
     const reader = new FileReader();
@@ -79,18 +79,16 @@ export default function ImportTransactionsPage() {
       try {
         const text = e.target?.result as string;
         const lines = text.split('\n').filter((l) => l.trim() !== '');
-
         if (!lines.length) {
           setParseError('CSV file is empty');
           return;
         }
 
-        // Detect delimiter (comma, tab, semicolon)
+        // Detect delimiter
         const firstLine = lines[0];
-        const delimiters = [',', '\t', ';', '|'];
-        let bestDelimiter = ',';
+        const delimiters = ['\t', ',', ';', '|'];
+        let bestDelimiter = '\t';
         let maxColumns = 0;
-
         delimiters.forEach((delimiter) => {
           const columns = firstLine.split(delimiter).length;
           if (columns > maxColumns) {
@@ -99,178 +97,81 @@ export default function ImportTransactionsPage() {
           }
         });
 
-        // Check if first line is header or data
-        const firstLineParts = firstLine.split(bestDelimiter).map((v) => v.trim());
-        const isHeader = firstLineParts.some((part) =>
-          isNaN(parseFloat(part)) && part.length > 0
-        );
-
-        let headers: string[];
-        let dataLines: string[];
-
-        if (isHeader) {
-          headers = firstLineParts;
-          dataLines = lines.slice(1);
-        } else {
-          // Auto-generate headers if no header row
-          headers = firstLineParts.map((_, i) => `Column ${i + 1}`);
-          dataLines = lines;
-        }
-
-        // Parse rows
-        const rows = dataLines.map((line) => {
+        const rows = lines.map((line) => {
           const values = line.split(bestDelimiter).map((v) => v.trim());
-          const obj: Record<string, string> = {};
-          headers.forEach((h, i) => {
-            obj[h] = values[i] || '';
-          });
-          return obj;
+          return {
+            date: values[0] || '',
+            description: values[1] || '',
+            debit: values[2] || '',
+            credit: values[3] || '',
+            balance: values[4] || '',
+          };
         });
 
-        setCsvData({ headers, rows, totalRows: rows.length });
+        setCsvData({ headers: ['date', 'description', 'debit', 'credit', 'balance'], rows, totalRows: rows.length });
         setParseError(null);
 
-        // Auto-detect mapping
-        autoDetectMapping(rows, headers);
+        setHeaderMapping({ date: 'date', description: 'description', debit: 'debit', credit: 'credit', balance: 'balance' });
         setStep('mapping');
       } catch (error) {
         setParseError('Failed to parse CSV file. Please check the file format.');
         console.error('Parse error:', error);
       }
     };
-    reader.onerror = () => {
-      setParseError('Failed to read file');
-    };
+    reader.onerror = () => setParseError('Failed to read file');
     reader.readAsText(file);
   };
 
   // -----------------------------
-  // Auto-detect column mapping
-  // -----------------------------
-  const autoDetectMapping = (rows: Record<string, string>[], headers: string[]) => {
-    if (!rows.length) return;
-
-    const mapping: HeaderMapping = {};
-
-    // Helper to check if value looks like a date
-    const isDateLike = (val: string) => {
-      if (!val) return false;
-      return /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(val) ||
-             /\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/.test(val);
-    };
-
-    // Helper to check if value is numeric
-    const isNumeric = (val: string) => {
-      if (!val) return false;
-      const cleaned = val.replace(/[,\$\s]/g, '');
-      return !isNaN(parseFloat(cleaned)) && isFinite(parseFloat(cleaned));
-    };
-
-    // Sample multiple rows for better detection
-    const sampleSize = Math.min(5, rows.length);
-    const samples = rows.slice(0, sampleSize);
-
-    headers.forEach((header) => {
-      const headerLower = header.toLowerCase();
-      const sampleValues = samples.map((row) => row[header]);
-
-      // Date detection
-      if (!mapping.date && (
-        headerLower.includes('date') ||
-        headerLower.includes('trans') ||
-        sampleValues.every(isDateLike)
-      )) {
-        mapping.date = header;
-      }
-
-      // Description detection
-      if (!mapping.description && (
-        headerLower.includes('description') ||
-        headerLower.includes('detail') ||
-        headerLower.includes('memo') ||
-        headerLower.includes('narrative') ||
-        sampleValues.every((v) => v && !isNumeric(v) && !isDateLike(v) && v.length > 3)
-      )) {
-        mapping.description = header;
-      }
-
-      // Debit detection
-      if (!mapping.debit && (
-        headerLower.includes('debit') ||
-        headerLower.includes('withdrawal') ||
-        headerLower.includes('spent')
-      )) {
-        mapping.debit = header;
-      }
-
-      // Credit detection
-      if (!mapping.credit && (
-        headerLower.includes('credit') ||
-        headerLower.includes('deposit') ||
-        headerLower.includes('received')
-      )) {
-        mapping.credit = header;
-      }
-
-      // Balance detection
-      if (!mapping.balance && (
-        headerLower.includes('balance') ||
-        headerLower.includes('running')
-      )) {
-        mapping.balance = header;
-      }
-
-      // Amount detection (single column for both debit/credit)
-      if (!mapping.amount && !mapping.debit && !mapping.credit && (
-        headerLower.includes('amount') ||
-        (sampleValues.every(isNumeric) && !headerLower.includes('balance'))
-      )) {
-        mapping.amount = header;
-      }
-    });
-
-    setHeaderMapping(mapping);
-  };
-
-  // -----------------------------
-  // Build preview transactions - Simple & Direct
+  // Build preview
   // -----------------------------
   const buildPreview = (): Transaction[] => {
     if (!csvData) return [];
 
-    return csvData.rows.map((row, index) => {
-      const date = headerMapping.date ? row[headerMapping.date] || '' : '';
-      const description = headerMapping.description ? row[headerMapping.description] || '' : '';
-      const creditRaw = headerMapping.credit ? row[headerMapping.credit] || '' : '';
-      const debitRaw = headerMapping.debit ? row[headerMapping.debit] || '' : '';
-      const balanceRaw = headerMapping.balance ? row[headerMapping.balance] || '' : '';
+    const parseAmount = (value?: string) => {
+      if (!value) return 0;
+      let cleaned = value.toString().replace(/[$,₹\s]/g, '').trim();
+      if (cleaned.startsWith('(') && cleaned.endsWith(')')) cleaned = '-' + cleaned.slice(1, -1);
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
 
-      const credit = parseFloat(creditRaw) || 0;
-      const debit = parseFloat(debitRaw) || 0;
-      const balance = parseFloat(balanceRaw) || 0;
+    const result: Transaction[] = [];
+
+    csvData.rows.forEach((row, idx) => {
+      const date = row.date;
+      const description = row.description;
+      const debit = parseAmount(row.debit);
+      const credit = parseAmount(row.credit);
+      const balance = parseAmount(row.balance);
+
       let amount = 0;
       let type: 'income' | 'expense' = 'expense';
 
-      // Credit column = expenses, Debit column = income/credits
       if (credit > 0) {
         amount = credit;
-        type = 'expense';
+        type = 'income';
       } else if (debit > 0) {
         amount = debit;
+        type = 'expense';
+      } else if (description.toUpperCase().includes('PAYMENT') || description.toUpperCase().includes('THANK YOU')) {
+        amount = credit || debit;
         type = 'income';
       }
 
-      return {
-        id: btoa(`${date}-${description}-${amount}-${index}`),
+      result.push({
+        id: `${date}-${description}-${amount}-${idx}`,
         date,
         description,
-        amount,
+        amount: Math.abs(amount),
         type,
         currency: 'CAD',
         account: selectedAccount,
         balance: balance || undefined,
-      };
-    }).filter((t) => t.amount > 0); // Filter out empty rows
+      });
+    });
+
+    return result;
   };
 
   // -----------------------------
@@ -320,16 +221,9 @@ export default function ImportTransactionsPage() {
     }
   };
 
-  const handleMappingChange = (field: keyof HeaderMapping, value: string) => {
-    setHeaderMapping((prev) => ({
-      ...prev,
-      [field]: value === EMPTY_VALUE ? undefined : value,
-    }));
-  };
-
   const preparePreview = () => {
     if (!csvData) return;
-    const preview = buildPreview(csvData, headerMapping);
+    const preview = buildPreview();
     const { unique, duplicates } = detectDuplicates(preview);
     setPreviewRows(unique);
     setDuplicateCount(duplicates);
@@ -362,7 +256,6 @@ export default function ImportTransactionsPage() {
     setPreviewRows([]);
     setDuplicateCount(0);
   };
-
 
   // -----------------------------
   // Render
@@ -403,6 +296,7 @@ export default function ImportTransactionsPage() {
                   </label>
                 </Button>
               </div>
+              {parseError && <p className="text-red-500 mt-2">{parseError}</p>}
             </CardContent>
           </Card>
         )}
@@ -418,7 +312,11 @@ export default function ImportTransactionsPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {(['date','description','debit','credit','balance'] as (keyof HeaderMapping)[]).map((field) => (
                   <div key={field} className="space-y-2">
-                    <Label>{field.charAt(0).toUpperCase() + field.slice(1)}</Label>
+                    <Label>
+                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                      {field === 'debit' && <span className="text-xs text-muted-foreground ml-1">(Expenses)</span>}
+                      {field === 'credit' && <span className="text-xs text-muted-foreground ml-1">(Payment / Refund)</span>}
+                    </Label>
                     <Select
                       value={headerMapping[field] ?? EMPTY_VALUE}
                       onValueChange={(v) => handleMappingChange(field, v)}
@@ -436,7 +334,9 @@ export default function ImportTransactionsPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4">
+              <div className="flex justify-between mt-4">
+                {/* Back Button */}
+                <Button variant="outline" onClick={() => setStep('upload')}>Back</Button>
                 <Button onClick={preparePreview}>Preview Transactions</Button>
               </div>
             </CardContent>
@@ -448,7 +348,7 @@ export default function ImportTransactionsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Preview Transactions</CardTitle>
-              <CardDescription>Check the first rows before import</CardDescription>
+              <CardDescription>Check the first rows before import ({previewRows.length} transactions found)</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -464,16 +364,29 @@ export default function ImportTransactionsPage() {
                   {previewRows.slice(0, 10).map((t) => (
                     <TableRow key={t.id}>
                       <TableCell>{t.date}</TableCell>
-                      <TableCell>{t.description}</TableCell>
-                      <TableCell>{t.type}</TableCell>
-                      <TableCell className="text-right">{t.amount.toFixed(2)}</TableCell>
+                      <TableCell className="max-w-xs truncate">{t.description}</TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          t.type === 'income'
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        )}>
+                          {t.type === 'income' ? 'Refund / Payment' : 'Expense'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${t.amount.toFixed(2)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               <div className="flex justify-between mt-4">
                 <Button variant="outline" onClick={() => setStep('mapping')}>Back</Button>
-                <Button onClick={handleStartImport}>Start Import</Button>
+                <Button onClick={handleStartImport}>
+                  Import {previewRows.length} Transaction{previewRows.length !== 1 ? 's' : ''}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -498,7 +411,7 @@ export default function ImportTransactionsPage() {
             <CardContent className="py-12 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Import Complete!</h3>
-              <p>{previewRows.length} transactions imported, {duplicateCount} duplicates skipped.</p>
+              <p>{previewRows.length} transactions imported{duplicateCount > 0 ? `, ${duplicateCount} duplicates skipped` : ''}.</p>
               <div className="flex justify-center gap-3 mt-4">
                 <Button variant="outline" onClick={resetImport}>Import Another File</Button>
               </div>
